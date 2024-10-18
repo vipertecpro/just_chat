@@ -2,17 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class OneOnOneConversation extends Controller
 {
-    public function oneOnOneConversation(Request $request)
+    public function oneOnOneConversation(User $friend, Request $request)
     {
         return Inertia::render('OneOnOneChat', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
-            'status' => session('status'),
+            'friend'          => $friend
         ]);
     }
 }

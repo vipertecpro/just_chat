@@ -16,6 +16,9 @@ Route::post('/user/online-status', function (Request $request) {
 Route::group([
     'prefix' => 'internal',
     'as'    => 'internal.',
+    'middleware' => 'web'
 ],function(){
     Route::post('/online-users',[InternalApiController::class,'onlineUsers'])->name('onlineUsers');
+    Route::get('/singleChat/{user}',[InternalApiController::class,'singleChat'])->name('singleChat');
+    Route::post('/singleChat/{user}',[InternalApiController::class,'sendMessageSingleChat'])->name('sendMessageSingleChat');
 });

@@ -1,8 +1,59 @@
 <script setup lang="ts">
-import {Link, usePage} from '@inertiajs/vue3';
-import OnlineUsers from "@/Components/OnlineUsers.vue";
+import { ref, provide, onMounted } from 'vue';
+import axios from 'axios';
+import { usePage } from '@inertiajs/vue3';
+import OnlineUsers from '@/Components/OnlineUsers.vue';
+import OneOnOneChat from '@/Pages/OneOnOneChat.vue';
+import { Link } from '@inertiajs/vue3';
+
 const user = usePage().props.auth.user;
+
+interface User {
+    id: number;
+    name: string;
+    email: string;
+    is_online: boolean;
+}
+
+const onlineUsers = ref<User[]>([]);
+const isFetched = ref(false);
+const selectedUser = ref<User | null>(null);
+
+const fetchOnlineUsers = () => {
+    if (!isFetched.value) {
+        axios.post('/api/internal/online-users').then(response => {
+            onlineUsers.value = response.data;
+            isFetched.value = true;
+        });
+    }
+};
+
+// Select a user to start a one-on-one chat
+const selectUser = (user: User) => {
+    selectedUser.value = user;
+};
+
+// Reset selectedUser to null, exiting the chat view
+const closeChat = () => {
+    selectedUser.value = null;
+};
+
+onMounted(() => {
+    window.Echo.channel('online-users')
+        .listen('UserStatusChanged', () => {
+            fetchOnlineUsers();
+        });
+    fetchOnlineUsers();
+});
+
+provide('onlineUsers', onlineUsers);
+provide('fetchOnlineUsers', fetchOnlineUsers);
+provide('selectedUser', selectedUser);
+provide('selectUser', selectUser);
+provide('closeChat', closeChat);
 </script>
+
+
 <template>
     <div>
         <div class="flex justify-between h-full xl:h-[calc(100vh-38px)] w-full xl:w-[calc(100vw-38px)] xl:max-w-[1600px] top-0 xl:top-[19px] bg-gray-100 dark:bg-gray-900 mx-auto  overflow-hidden relative gap-1 ">
@@ -87,7 +138,12 @@ const user = usePage().props.auth.user;
                         <path clip-rule="evenodd" fill-rule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 10.5a.75.75 0 01.75-.75h7.5a.75.75 0 010 1.5h-7.5a.75.75 0 01-.75-.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z"></path>
                     </svg>
                 </button>
-                <slot />
+                <div v-if="selectedUser">
+                    <OneOnOneChat :friend="selectedUser" :current-user="user" @closeChat="closeChat" />
+                </div>
+                <div v-else>
+                    <slot />
+                </div>
             </div>
         </div>
     </div>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import {onMounted, ref} from 'vue';
-import axios from 'axios';
-import {Link, usePage} from '@inertiajs/vue3';
+import { inject, ref, Ref } from 'vue';
+import { Link } from '@inertiajs/vue3';
+
 interface User {
     id: number;
     name: string;
@@ -9,28 +9,17 @@ interface User {
     is_online: boolean;
 }
 
-const state = ref<{ onlineUsers: User[] }>({
-    onlineUsers: [],
-});
-const fetchOnlineUsers = () => {
-    axios.post('/api/internal/online-users').then(response => {
-        state.value.onlineUsers = response.data;
-    });
+const onlineUsers = inject<User[]>('onlineUsers', []);
+const selectedUser = inject<Ref<User | null>>('selectedUser', ref(null));
+
+const selectUser = (user: User) => {
+    selectedUser.value = user;
 };
-onMounted(() => {
-    fetchOnlineUsers();
-    window.addEventListener('load',  () =>{
-        window.Echo.channel('online-users')
-            .listen('UserStatusChanged', (e) => {
-                fetchOnlineUsers();
-            });
-    });
-});
 </script>
 
 <template>
-    <li class="hover:bg-gray-900" v-for="user in state.onlineUsers" :key="user.id">
-        <Link :href="route('oneOnOneConversation')" class="flex items-center rtl:space-x-reverse">
+    <li class="hover:bg-gray-900" v-for="user in onlineUsers" :key="user.id">
+        <a @click.prevent="selectUser(user)" class="flex items-center rtl:space-x-reverse">
             <div class="flex-shrink-0 px-4">
                 <div class="relative">
                     <img class="w-10 h-10 rounded-full" src="/avatar-person.svg" alt="{{ user.name }}">
@@ -46,7 +35,7 @@ onMounted(() => {
                     {{ user.email }}
                 </p>
             </div>
-        </Link>
+        </a>
     </li>
 </template>
 

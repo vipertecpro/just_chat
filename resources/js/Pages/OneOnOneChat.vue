@@ -1,178 +1,148 @@
 <script setup lang="ts">
+import axios from "axios";
+import { nextTick, onMounted, ref, watch } from "vue";
 
-import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
+const props = defineProps({
+    friend: {
+        type: Object,
+        required: true,
+    },
+    currentUser: {
+        type: Object,
+        required: true,
+    },
+});
+
+const messages = ref([]);
+const newMessage = ref("");
+const messageBox = ref(null); // Correct ref for the scrollable message box
+const isFriendTyping = ref(false);
+const isFriendTypingTimer = ref(null);
+
+// Function to auto-scroll the chat to the bottom
+const scrollToBottom = () => {
+    nextTick(() => {
+        if (messageBox.value) {
+            messageBox.value.scrollTo({
+                top: messageBox.value.scrollHeight,
+                behavior: "smooth",
+            });
+        }
+    });
+};
+
+// Watcher to trigger scroll on message changes
+watch(
+    messages,
+    () => {
+        scrollToBottom();
+    },
+    { deep: true }
+);
+
+const sendMessage = (e) => {
+    e.preventDefault();
+    if (newMessage.value.trim() !== "") {
+        axios
+            .post(`/api/internal/singleChat/${props.friend.id}`, {
+                message: newMessage.value,
+            })
+            .then((response) => {
+                messages.value.push(response.data);
+                newMessage.value = "";
+                scrollToBottom(); // Scroll after sending a message
+            });
+    }
+};
+
+const sendTypingEvent = () => {
+    Echo.private(`chat.${props.friend.id}`).whisper("typing", {
+        userID: props.currentUser.id,
+    });
+};
+
+onMounted(() => {
+    axios.get(`/api/internal/singleChat/${props.friend.id}`).then((response) => {
+        messages.value = response.data;
+        scrollToBottom(); // Scroll after fetching chat history
+    });
+
+    Echo.private(`chat.${props.currentUser.id}`)
+        .listen("MessageSent", (response) => {
+            messages.value.push(response.message);
+            scrollToBottom(); // Scroll when a new message is received
+        })
+        .listenForWhisper("typing", (response) => {
+            isFriendTyping.value = response.userID === props.friend.id;
+
+            if (isFriendTypingTimer.value) {
+                clearTimeout(isFriendTypingTimer.value);
+            }
+
+            isFriendTypingTimer.value = setTimeout(() => {
+                isFriendTyping.value = false;
+            }, 1000);
+        });
+});
 </script>
 
+
 <template>
-    <AuthenticatedLayout>
-    <div class="flex flex-col justify-between items-center rounded-lg h-[100vh] xl:h-[calc(100vh-38px)] relative">
+    <div v-if="friend" class="flex flex-col justify-between items-center rounded-lg h-[100vh] xl:h-[calc(100vh-38px)] relative">
+        <!-- Chat Header -->
         <div class="flex w-full justify-start items-center dark:bg-gray-700 gap-2 p-2 border-b dark:border-gray-700 pl-16 xl:pl-2">
             <img src="/avatar-person.svg" alt="User" class="w-10 h-10 rounded-full" />
-            <h2 class="text-lg dark:text-gray-200">John Doe</h2>
+            <h2 class="text-lg dark:text-gray-200">{{ friend.name }}</h2>
         </div>
-        <div class="bg-gray-800 w-full h-full p-14 dark:bg-gray-800 overflow-y-auto flex flex-col gap-4">
-            <div class="flex items-start gap-2.5 justify-start">
-                <div class="flex flex-col gap-1 w-full max-w-[320px]">
-                    <div class="flex items-center space-x-2 rtl:space-x-reverse">
-                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Bonnie Green</span>
-                        <span class="text-sm font-normal text-gray-500 dark:text-gray-400">11:46</span>
+
+        <!-- Messages Container -->
+        <div class="flex-1 w-full overflow-y-auto p-4" ref="messageBox" style="max-height: calc(100vh - 120px);">
+            <div v-for="message in messages" :key="message.id">
+                <div v-if="message.sender_id === currentUser.id" class="flex items-start gap-2.5 justify-end">
+                    <div class="flex flex-col gap-2 w-full max-w-[320px] mb-2">
+                        <div class="p-4 bg-blue-100 text-gray-900 dark:bg-gray-700 dark:text-white rounded-lg">
+                            {{ message.text }}
+                            <div class="flex items-center justify-end space-x-2 rtl:space-x-reverse">
+                                <span class="text-sm font-normal text-gray-500 dark:text-gray-400">{{ message.created_at_relative }}</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex flex-col leading-1.5 p-4 border-gray-200 bg-gray-100 rounded-e-xl rounded-es-xl dark:bg-gray-700">
-                        <p class="text-sm font-normal text-gray-900 dark:text-white"> That's awesome. I think our users will really appreciate the improvements.</p>
-                    </div>
-                    <span class="text-sm font-normal text-gray-500 dark:text-gray-400">Delivered</span>
                 </div>
-            </div>
-            <div class="flex items-start gap-2.5 justify-end">
-                <div class="flex flex-col gap-1 w-full max-w-[320px]">
-                    <div class="flex items-center space-x-2 rtl:space-x-reverse">
-                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Bonnie Green</span>
-                        <span class="text-sm font-normal text-gray-500 dark:text-gray-400">11:46</span>
+                <div v-else class="flex items-start gap-2.5 justify-start mb-2">
+                    <div class="flex flex-col gap-1 w-full max-w-[320px]">
+                        <div class="p-4 bg-gray-200 dark:bg-gray-700 rounded-lg text-gray-900 dark:text-white">
+                            {{ message.text }}
+                            <div class="flex items-center justify-end space-x-2 rtl:space-x-reverse">
+                                <span class="text-sm font-normal text-gray-500 dark:text-gray-400">{{ message.created_at_relative }}</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex flex-col leading-1.5 p-4 border-gray-200 bg-gray-100 rounded-e-xl rounded-es-xl dark:bg-gray-700">
-                        <p class="text-sm font-normal text-gray-900 dark:text-white"> That's awesome. I think our users will really appreciate the improvements.</p>
-                    </div>
-                    <span class="text-sm font-normal text-gray-500 dark:text-gray-400">Delivered</span>
-                </div>
-            </div>
-            <div class="flex items-start gap-2.5 justify-start">
-                <div class="flex flex-col gap-1 w-full max-w-[320px]">
-                    <div class="flex items-center space-x-2 rtl:space-x-reverse">
-                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Bonnie Green</span>
-                        <span class="text-sm font-normal text-gray-500 dark:text-gray-400">11:46</span>
-                    </div>
-                    <div class="flex flex-col leading-1.5 p-4 border-gray-200 bg-gray-100 rounded-e-xl rounded-es-xl dark:bg-gray-700">
-                        <p class="text-sm font-normal text-gray-900 dark:text-white"> That's awesome. I think our users will really appreciate the improvements.</p>
-                    </div>
-                    <span class="text-sm font-normal text-gray-500 dark:text-gray-400">Delivered</span>
-                </div>
-            </div>
-            <div class="flex items-start gap-2.5 justify-end">
-                <div class="flex flex-col gap-1 w-full max-w-[320px]">
-                    <div class="flex items-center space-x-2 rtl:space-x-reverse">
-                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Bonnie Green</span>
-                        <span class="text-sm font-normal text-gray-500 dark:text-gray-400">11:46</span>
-                    </div>
-                    <div class="flex flex-col leading-1.5 p-4 border-gray-200 bg-gray-100 rounded-e-xl rounded-es-xl dark:bg-gray-700">
-                        <p class="text-sm font-normal text-gray-900 dark:text-white"> That's awesome. I think our users will really appreciate the improvements.</p>
-                    </div>
-                    <span class="text-sm font-normal text-gray-500 dark:text-gray-400">Delivered</span>
-                </div>
-            </div>
-            <div class="flex items-start gap-2.5 justify-start">
-                <div class="flex flex-col gap-1 w-full max-w-[320px]">
-                    <div class="flex items-center space-x-2 rtl:space-x-reverse">
-                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Bonnie Green</span>
-                        <span class="text-sm font-normal text-gray-500 dark:text-gray-400">11:46</span>
-                    </div>
-                    <div class="flex flex-col leading-1.5 p-4 border-gray-200 bg-gray-100 rounded-e-xl rounded-es-xl dark:bg-gray-700">
-                        <p class="text-sm font-normal text-gray-900 dark:text-white"> That's awesome. I think our users will really appreciate the improvements.</p>
-                    </div>
-                    <span class="text-sm font-normal text-gray-500 dark:text-gray-400">Delivered</span>
-                </div>
-            </div>
-            <div class="flex items-start gap-2.5 justify-end">
-                <div class="flex flex-col gap-1 w-full max-w-[320px]">
-                    <div class="flex items-center space-x-2 rtl:space-x-reverse">
-                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Bonnie Green</span>
-                        <span class="text-sm font-normal text-gray-500 dark:text-gray-400">11:46</span>
-                    </div>
-                    <div class="flex flex-col leading-1.5 p-4 border-gray-200 bg-gray-100 rounded-e-xl rounded-es-xl dark:bg-gray-700">
-                        <p class="text-sm font-normal text-gray-900 dark:text-white"> That's awesome. I think our users will really appreciate the improvements.</p>
-                    </div>
-                    <span class="text-sm font-normal text-gray-500 dark:text-gray-400">Delivered</span>
-                </div>
-            </div>
-            <div class="flex items-start gap-2.5 justify-start">
-                <div class="flex flex-col gap-1 w-full max-w-[320px]">
-                    <div class="flex items-center space-x-2 rtl:space-x-reverse">
-                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Bonnie Green</span>
-                        <span class="text-sm font-normal text-gray-500 dark:text-gray-400">11:46</span>
-                    </div>
-                    <div class="flex flex-col leading-1.5 p-4 border-gray-200 bg-gray-100 rounded-e-xl rounded-es-xl dark:bg-gray-700">
-                        <p class="text-sm font-normal text-gray-900 dark:text-white"> That's awesome. I think our users will really appreciate the improvements.</p>
-                    </div>
-                    <span class="text-sm font-normal text-gray-500 dark:text-gray-400">Delivered</span>
-                </div>
-            </div>
-            <div class="flex items-start gap-2.5 justify-end">
-                <div class="flex flex-col gap-1 w-full max-w-[320px]">
-                    <div class="flex items-center space-x-2 rtl:space-x-reverse">
-                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Bonnie Green</span>
-                        <span class="text-sm font-normal text-gray-500 dark:text-gray-400">11:46</span>
-                    </div>
-                    <div class="flex flex-col leading-1.5 p-4 border-gray-200 bg-gray-100 rounded-e-xl rounded-es-xl dark:bg-gray-700">
-                        <p class="text-sm font-normal text-gray-900 dark:text-white"> That's awesome. I think our users will really appreciate the improvements.</p>
-                    </div>
-                    <span class="text-sm font-normal text-gray-500 dark:text-gray-400">Delivered</span>
-                </div>
-            </div>
-            <div class="flex items-start gap-2.5 justify-start">
-                <div class="flex flex-col gap-1 w-full max-w-[320px]">
-                    <div class="flex items-center space-x-2 rtl:space-x-reverse">
-                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Bonnie Green</span>
-                        <span class="text-sm font-normal text-gray-500 dark:text-gray-400">11:46</span>
-                    </div>
-                    <div class="flex flex-col leading-1.5 p-4 border-gray-200 bg-gray-100 rounded-e-xl rounded-es-xl dark:bg-gray-700">
-                        <p class="text-sm font-normal text-gray-900 dark:text-white"> That's awesome. I think our users will really appreciate the improvements.</p>
-                    </div>
-                    <span class="text-sm font-normal text-gray-500 dark:text-gray-400">Delivered</span>
-                </div>
-            </div>
-            <div class="flex items-start gap-2.5 justify-end">
-                <div class="flex flex-col gap-1 w-full max-w-[320px]">
-                    <div class="flex items-center space-x-2 rtl:space-x-reverse">
-                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Bonnie Green</span>
-                        <span class="text-sm font-normal text-gray-500 dark:text-gray-400">11:46</span>
-                    </div>
-                    <div class="flex flex-col leading-1.5 p-4 border-gray-200 bg-gray-100 rounded-e-xl rounded-es-xl dark:bg-gray-700">
-                        <p class="text-sm font-normal text-gray-900 dark:text-white"> That's awesome. I think our users will really appreciate the improvements.</p>
-                    </div>
-                    <span class="text-sm font-normal text-gray-500 dark:text-gray-400">Delivered</span>
-                </div>
-            </div>
-            <div class="flex items-start gap-2.5 justify-start">
-                <div class="flex flex-col gap-1 w-full max-w-[320px]">
-                    <div class="flex items-center space-x-2 rtl:space-x-reverse">
-                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Bonnie Green</span>
-                        <span class="text-sm font-normal text-gray-500 dark:text-gray-400">11:46</span>
-                    </div>
-                    <div class="flex flex-col leading-1.5 p-4 border-gray-200 bg-gray-100 rounded-e-xl rounded-es-xl dark:bg-gray-700">
-                        <p class="text-sm font-normal text-gray-900 dark:text-white"> That's awesome. I think our users will really appreciate the improvements.</p>
-                    </div>
-                    <span class="text-sm font-normal text-gray-500 dark:text-gray-400">Delivered</span>
-                </div>
-            </div>
-            <div class="flex items-start gap-2.5 justify-end">
-                <div class="flex flex-col gap-1 w-full max-w-[320px]">
-                    <div class="flex items-center space-x-2 rtl:space-x-reverse">
-                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Bonnie Green</span>
-                        <span class="text-sm font-normal text-gray-500 dark:text-gray-400">11:46</span>
-                    </div>
-                    <div class="flex flex-col leading-1.5 p-4 border-gray-200 bg-gray-100 rounded-e-xl rounded-es-xl dark:bg-gray-700">
-                        <p class="text-sm font-normal text-gray-900 dark:text-white"> That's awesome. I think our users will really appreciate the improvements.</p>
-                    </div>
-                    <span class="text-sm font-normal text-gray-500 dark:text-gray-400">Delivered</span>
                 </div>
             </div>
         </div>
-        <form class="absolute w-full bottom-0">
-            <label for="chat" class="sr-only">Your message</label>
-            <div class="flex items-center px-3 py-2 bg-gray-50 dark:bg-gray-800">
-                <input id="chat" rows="1" class="block mx-4 p-2.5 w-full text-sm text-gray-900 bg-white rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="Your message..." />
-                <button type="submit" class="inline-flex justify-center p-2 text-blue-600 rounded-full cursor-pointer hover:bg-blue-100 dark:text-blue-500 dark:hover:bg-gray-600">
-                    <svg class="w-5 h-5 rotate-90 rtl:-rotate-90" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 18 20">
+        <small v-if="isFriendTyping" class="text-gray-700 dark:text-gray-500 h-fit w-full flex px-2 my-2">
+            {{ friend.name }} is typing...
+        </small>
+        <form class="w-full bottom-0 p-2 bg-gray-50 dark:bg-gray-800" @submit.prevent="sendMessage">
+            <div class="flex items-center">
+                <input
+                    id="chat"
+                    v-model="newMessage"
+                    class="block p-2.5 w-full text-sm bg-white border rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                    placeholder="Type a message..."
+                    @keydown="sendTypingEvent"
+                    @keyup.enter="sendMessage"
+                />
+                <button type="button" @click="sendMessage" class="ml-2 p-2 text-blue-600 rounded-full dark:text-blue-500">
+                    <svg class="w-5 h-5 rotate-90 rtl:-rotate-90" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 18 20">
                         <path d="m17.914 18.594-8-18a1 1 0 0 0-1.828 0l-8 18a1 1 0 0 0 1.157 1.376L8 18.281V9a1 1 0 0 1 2 0v9.281l6.758 1.689a1 1 0 0 0 1.156-1.376Z"/>
                     </svg>
-                    <span class="sr-only">Send message</span>
                 </button>
             </div>
         </form>
-
     </div>
-    </AuthenticatedLayout>
+    <div v-else>
+        <p>No friend selected.</p>
+    </div>
 </template>
 
-<style scoped>
-
-</style>
