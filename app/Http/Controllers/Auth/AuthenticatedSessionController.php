@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Events\UserStatusChanged;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Http\RedirectResponse;
@@ -32,7 +33,7 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
 
         $request->session()->regenerate();
-
+        event(new UserStatusChanged(auth()->user()));
         return redirect()->intended(route('dashboard', absolute: false));
     }
 
@@ -41,6 +42,10 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        if (auth()->check()) {
+            auth()->user()->update(['is_online' => false]);
+        }
+        event(new UserStatusChanged(auth()->user()));
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

@@ -25,7 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
-        $middleware->alias([
+        $middleware->web([
             'update-online-status' => UpdateUserOnlineStatus::class,
         ]);
     })
