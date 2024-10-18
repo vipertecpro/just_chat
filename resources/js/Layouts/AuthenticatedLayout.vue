@@ -50,8 +50,8 @@ const user = usePage().props.auth.user;
                         </li>
                     </ul>
                 </div>
-                <div id="secondary-sidenav" class="flex flex-col relative py-5 px-2 max-w-full w-full h-full bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-                    <div class="flex flex-col justify-start w-full max-w-full items-start gap-2 text-start">
+                <div id="secondary-sidenav" class="flex flex-col relative py-5 max-w-full w-full h-full bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+                    <div class="flex flex-col justify-start w-full max-w-full items-start gap-2 text-start  px-2">
                         <h4 class="text-2xl font-extrabold text-gray-700 dark:text-white">Chats</h4>
                         <div class="flex flex-col items-start justify-start gap-2 w-full max-w-full">
                             <form class="flex-1 justify-start w-full">
@@ -74,7 +74,7 @@ const user = usePage().props.auth.user;
                         </div>
                     </div>
                     <div class="pt-2 pb-40 h-full w-full overflow-y-auto">
-                        <ul class="w-full max-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <ul class="w-full max-w-full">
                             <OnlineUsers />
                         </ul>
                     </div>
