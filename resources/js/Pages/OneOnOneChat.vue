@@ -1,25 +1,33 @@
 <script setup lang="ts">
 import axios from "axios";
 import { nextTick, onMounted, ref, watch } from "vue";
+import { EchoServer } from "@/echo";
+import { PresenceChannel } from 'laravel-echo';
 
-const props = defineProps({
-    friend: {
-        type: Object,
-        required: true,
-    },
-    currentUser: {
-        type: Object,
-        required: true,
-    },
-});
+interface User {
+    id: number;
+    name: string;
+}
 
-const messages = ref([]);
+interface Message {
+    id: number;
+    sender_id: number;
+    receiver_id: number;
+    text: string;
+    created_at_relative: string;
+}
+
+const props = defineProps<{
+    friend: User;
+    currentUser: User;
+}>();
+
+const messages = ref<Message[]>([]);
 const newMessage = ref("");
-const messageBox = ref(null); // Correct ref for the scrollable message box
+const messageBox = ref<HTMLDivElement | null>(null);
 const isFriendTyping = ref(false);
-const isFriendTypingTimer = ref(null);
+const isFriendTypingTimer = ref<number | null>(null);
 
-// Function to auto-scroll the chat to the bottom
 const scrollToBottom = () => {
     nextTick(() => {
         if (messageBox.value) {
@@ -31,71 +39,72 @@ const scrollToBottom = () => {
     });
 };
 
-// Watcher to trigger scroll on message changes
-watch(
-    messages,
-    () => {
-        scrollToBottom();
-    },
-    { deep: true }
-);
+watch(messages, scrollToBottom, { deep: true });
 
-const sendMessage = (e) => {
-    e.preventDefault();
+const fetchMessages = async () => {
+    const response = await axios.get(`/api/internal/singleChat/${props.friend.id}`);
+    messages.value = response.data.filter((message: Message) =>
+        (message.sender_id === props.currentUser.id && message.receiver_id === props.friend.id) ||
+        (message.sender_id === props.friend.id && message.receiver_id === props.currentUser.id)
+    );
+    scrollToBottom();
+};
+
+const sendMessage = async () => {
     if (newMessage.value.trim() !== "") {
-        axios
-            .post(`/api/internal/singleChat/${props.friend.id}`, {
-                message: newMessage.value,
-            })
-            .then((response) => {
-                messages.value.push(response.data);
-                newMessage.value = "";
-                scrollToBottom(); // Scroll after sending a message
-            });
+        const response = await axios.post(`/api/internal/singleChat/${props.friend.id}`, {
+            message: newMessage.value,
+        });
+        const newMsg: Message = {
+            id: response.data.id,
+            sender_id: response.data.sender_id,
+            receiver_id: response.data.receiver_id,
+            text: response.data.text,
+            created_at_relative: response.data.created_at_relative,
+        };
+        messages.value.push(newMsg);
+        newMessage.value = "";
+        scrollToBottom();
     }
 };
 
 const sendTypingEvent = () => {
-    Echo.private(`chat.${props.friend.id}`).whisper("typing", {
+    (EchoServer.private(`chat.${props.friend.id}`) as PresenceChannel).whisper("typing", {
         userID: props.currentUser.id,
     });
 };
 
-onMounted(() => {
-    axios.get(`/api/internal/singleChat/${props.friend.id}`).then((response) => {
-        messages.value = response.data;
-        scrollToBottom(); // Scroll after fetching chat history
-    });
+onMounted(fetchMessages);
 
-    Echo.private(`chat.${props.currentUser.id}`)
-        .listen("MessageSent", (response) => {
+watch(() => props.friend, fetchMessages);
+
+EchoServer.private(`chat.${props.currentUser.id}`)
+    .listen("MessageSent", (response: { message: Message, unread_count: number }) => {
+        if ((response.message.sender_id === props.currentUser.id && response.message.receiver_id === props.friend.id) ||
+            (response.message.sender_id === props.friend.id && response.message.receiver_id === props.currentUser.id)) {
             messages.value.push(response.message);
-            scrollToBottom(); // Scroll when a new message is received
-        })
-        .listenForWhisper("typing", (response) => {
-            isFriendTyping.value = response.userID === props.friend.id;
+            scrollToBottom();
+        }
+    })
+    .listenForWhisper("typing", (response: { userID: number }) => {
+        isFriendTyping.value = response.userID === props.friend.id;
 
-            if (isFriendTypingTimer.value) {
-                clearTimeout(isFriendTypingTimer.value);
-            }
+        if (isFriendTypingTimer.value) {
+            clearTimeout(isFriendTypingTimer.value);
+        }
 
-            isFriendTypingTimer.value = setTimeout(() => {
-                isFriendTyping.value = false;
-            }, 1000);
-        });
-});
+        isFriendTypingTimer.value = window.setTimeout(() => {
+            isFriendTyping.value = false;
+        }, 1000);
+    });
 </script>
-
 
 <template>
     <div v-if="friend" class="flex flex-col justify-between items-center rounded-lg h-[100vh] xl:h-[calc(100vh-38px)] relative">
-        <!-- Chat Header -->
         <div class="flex w-full justify-start items-center dark:bg-gray-700 gap-2 p-2 border-b dark:border-gray-700 pl-16 xl:pl-2">
             <img src="/avatar-person.svg" alt="User" class="w-10 h-10 rounded-full" />
             <h2 class="text-lg dark:text-gray-200">{{ friend.name }}</h2>
         </div>
-
-        <!-- Messages Container -->
         <div class="flex-1 w-full overflow-y-auto p-4" ref="messageBox" style="max-height: calc(100vh - 120px);">
             <div v-for="message in messages" :key="message.id">
                 <div v-if="message.sender_id === currentUser.id" class="flex items-start gap-2.5 justify-end">
@@ -135,7 +144,7 @@ onMounted(() => {
                 />
                 <button type="button" @click="sendMessage" class="ml-2 p-2 text-blue-600 rounded-full dark:text-blue-500">
                     <svg class="w-5 h-5 rotate-90 rtl:-rotate-90" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 18 20">
-                        <path d="m17.914 18.594-8-18a1 1 0 0 0-1.828 0l-8 18a1 1 0 0 0 1.157 1.376L8 18.281V9a1 1 0 0 1 2 0v9.281l6.758 1.689a1 1 0 0 0 1.156-1.376Z"/>
+                        <path d="m17.914 18.594-8-18a1 1 0 0 0-1.828 0l-8 18a 1 0 0 0 1.157 1.376L8 18.281V9a1 1 0 0 1 2 0v9.281l6.758 1.689a1 1 0 0 0 1.156-1.376Z"/>
                     </svg>
                 </button>
             </div>
@@ -145,4 +154,3 @@ onMounted(() => {
         <p>No friend selected.</p>
     </div>
 </template>
-

@@ -21,4 +21,5 @@ Route::group([
     Route::post('/online-users',[InternalApiController::class,'onlineUsers'])->name('onlineUsers');
     Route::get('/singleChat/{user}',[InternalApiController::class,'singleChat'])->name('singleChat');
     Route::post('/singleChat/{user}',[InternalApiController::class,'sendMessageSingleChat'])->name('sendMessageSingleChat');
+    Route::post('/singleChat/{user}/markAsRead', [InternalApiController::class, 'markMessagesAsRead'])->name('markMessagesAsRead');
 });

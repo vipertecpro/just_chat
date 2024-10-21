@@ -1,48 +1,44 @@
 <script setup lang="ts">
-import { ref, provide, onMounted } from 'vue';
+import { ref, provide, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { usePage } from '@inertiajs/vue3';
 import OnlineUsers from '@/Components/OnlineUsers.vue';
 import OneOnOneChat from '@/Pages/OneOnOneChat.vue';
 import { Link } from '@inertiajs/vue3';
-
-const user = usePage().props.auth.user;
+import { EchoServer } from '@/echo';
 
 interface User {
     id: number;
     name: string;
     email: string;
     is_online: boolean;
+    unread_count: number;
 }
 
+const user = usePage().props.auth.user as User;
 const onlineUsers = ref<User[]>([]);
 const isFetched = ref(false);
 const selectedUser = ref<User | null>(null);
 
-const fetchOnlineUsers = () => {
+const fetchOnlineUsers = async () => {
     if (!isFetched.value) {
-        axios.post('/api/internal/online-users').then(response => {
-            onlineUsers.value = response.data;
-            isFetched.value = true;
-        });
+        const response = await axios.post('/api/internal/online-users');
+        onlineUsers.value = response.data;
+        isFetched.value = true;
     }
 };
 
-// Select a user to start a one-on-one chat
 const selectUser = (user: User) => {
     selectedUser.value = user;
 };
 
-// Reset selectedUser to null, exiting the chat view
 const closeChat = () => {
     selectedUser.value = null;
 };
 
 onMounted(() => {
-    window.Echo.channel('online-users')
-        .listen('UserStatusChanged', () => {
-            fetchOnlineUsers();
-        });
+    EchoServer.channel('online-users')
+        .listen('UserStatusChanged', fetchOnlineUsers);
     fetchOnlineUsers();
 });
 
@@ -52,8 +48,6 @@ provide('selectedUser', selectedUser);
 provide('selectUser', selectUser);
 provide('closeChat', closeChat);
 </script>
-
-
 <template>
     <div>
         <div class="flex justify-between h-full xl:h-[calc(100vh-38px)] w-full xl:w-[calc(100vw-38px)] xl:max-w-[1600px] top-0 xl:top-[19px] bg-gray-100 dark:bg-gray-900 mx-auto  overflow-hidden relative gap-1 ">

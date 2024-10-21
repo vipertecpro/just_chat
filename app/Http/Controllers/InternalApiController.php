@@ -12,6 +12,9 @@ class InternalApiController extends Controller
     public function onlineUsers(Request $request)
     {
         $users = User::where('id','!=',auth()->id())->orderBy('is_online', 'desc')->get();
+        $users->map(function ($user) {
+            $user->append('unread_count');
+        });
         return response()->json($users);
     }
     public function singleChat(User $user){
@@ -40,5 +43,13 @@ class InternalApiController extends Controller
         broadcast(new MessageSent($message));
 
         return $message;
+    }
+    public function markMessagesAsRead(User $user)
+    {
+        ChatMessage::where('sender_id', $user->id)
+            ->where('receiver_id', auth()->id())
+            ->update(['is_read' => true]);
+
+        return response()->json(['message' => 'Messages marked as read']);
     }
 }

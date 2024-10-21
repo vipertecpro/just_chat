@@ -46,4 +46,11 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+    public function getUnreadCountAttribute(): int
+    {
+        return ChatMessage::where('receiver_id', $this->id)
+            ->where('sender_id', '!=', $this->id)
+            ->where('is_read', false)
+            ->count();
+    }
 }
