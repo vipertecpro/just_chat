@@ -14,22 +14,31 @@ interface User {
 const onlineUsers = inject<Ref<User[]>>('onlineUsers', ref([]));
 const selectedUser = inject<Ref<User | null>>('selectedUser', ref(null));
 const currentUser = inject<User>('currentUser');
+const fetchOnlineUsers = inject<() => Promise<void>>('fetchOnlineUsers');
 
 const setupListeners = () => {
     if (currentUser) {
         EchoServer.private(`chat.${currentUser.id}`)
-            .listen('MessageSent', (response: { message: any, unread_count: number }) => {
+            .listen('MessageSent', async (response: { message: any, unread_count: number }) => {
                 const receiver = onlineUsers.value.find(u => u.id === response.message.sender_id);
                 if (receiver && selectedUser.value?.id !== response.message.sender_id) {
                     receiver.unread_count = response.unread_count;
+                }
+                // Re-fetch the list of online users to re-order the list
+                if (fetchOnlineUsers) {
+                    await fetchOnlineUsers();
                 }
             });
     }
 };
 
+const markMessagesAsRead = async (userId: number) => {
+    await axios.post(`/api/internal/singleChat/${userId}/markAsRead`);
+};
+
 const selectUser = async (user: User) => {
     selectedUser.value = user;
-    await axios.post(`/api/internal/singleChat/${user.id}/markAsRead`);
+    await markMessagesAsRead(user.id);
     user.unread_count = 0;
 };
 

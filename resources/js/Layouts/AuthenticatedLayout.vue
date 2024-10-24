@@ -21,14 +21,12 @@ const isFetched = ref(false);
 const selectedUser = ref<User | null>(null);
 
 const fetchOnlineUsers = async () => {
-    if (!isFetched.value) {
-        try {
-            const response = await axios.post('/api/internal/online-users');
-            onlineUsers.value = response.data;
-            isFetched.value = true;
-        } catch (error) {
-            console.error('Failed to fetch online users:', error);
-        }
+    try {
+        const response = await axios.post('/api/internal/online-users');
+        onlineUsers.value = response.data;
+        isFetched.value = true;
+    } catch (error) {
+        console.error('Failed to fetch online users:', error);
     }
 };
 

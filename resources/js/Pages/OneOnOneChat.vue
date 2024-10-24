@@ -77,8 +77,8 @@ const sendTypingEvent = () => {
     });
 };
 
-const markMessageAsRead = async (messageId: number) => {
-    await axios.post(`/api/internal/singleChat/${messageId}/markAsRead`);
+const markMessageAsRead = async (userId: number) => {
+    await axios.post(`/api/internal/singleChat/${userId}/markAsRead`);
 };
 
 onMounted(() => {
@@ -98,7 +98,7 @@ EchoServer.private(`chat.${props.currentUser.id}`)
             messages.value.push(response.message);
             scrollToBottom();
             if (response.message.sender_id === props.friend.id && isChatBoxOpen.value) {
-                await markMessageAsRead(response.message.id);
+                await markMessageAsRead(props.friend.id);
             }
         }
     })
@@ -156,7 +156,7 @@ EchoServer.private(`chat.${props.currentUser.id}`)
                     class="block p-2.5 w-full text-sm bg-white border rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                     placeholder="Type a message..."
                     @keydown="sendTypingEvent"
-                    @keyup.enter="sendMessage"
+                    @keydown.enter.prevent="sendMessage"
                 />
                 <button type="button" @click="sendMessage" class="ml-2 p-2 text-blue-600 rounded-full dark:text-blue-500">
                     <svg class="w-5 h-5 rotate-90 rtl:-rotate-90" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 18 20">

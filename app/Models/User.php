@@ -54,4 +54,14 @@ class User extends Authenticatable
             ->where('is_read', false)
             ->count();
     }
+
+    public function sentMessages()
+    {
+        return $this->hasMany(ChatMessage::class, 'sender_id');
+    }
+
+    public function receivedMessages()
+    {
+        return $this->hasMany(ChatMessage::class, 'receiver_id');
+    }
 }

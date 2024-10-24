@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Events\MessageSent;
+use Illuminate\Support\Facades\DB;
 use App\Models\ChatMessage;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -12,7 +13,14 @@ class InternalApiController extends Controller
     public function onlineUsers(Request $request)
     {
         $currentUserId = auth()->id();
+
         $users = User::where('id', '!=', $currentUserId)
+            ->withCount(['sentMessages as latest_unread_message' => function ($query) use ($currentUserId) {
+                $query->where('receiver_id', $currentUserId)
+                    ->where('is_read', false)
+                    ->select(DB::raw('MAX(created_at)'));
+            }])
+            ->orderBy('latest_unread_message', 'desc')
             ->orderBy('is_online', 'desc')
             ->get();
 
@@ -22,6 +30,7 @@ class InternalApiController extends Controller
                 ->where('is_read', false)
                 ->count();
         });
+
         return response()->json($users);
     }
     public function singleChat(User $user){
@@ -51,12 +60,14 @@ class InternalApiController extends Controller
 
         return $message;
     }
-    public function markMessagesAsRead(User $user)
+    public function markMessagesAsRead(Request $request, $userId)
     {
-        ChatMessage::where('sender_id', $user->id)
-            ->where('receiver_id', auth()->id())
+        $currentUserId = auth()->id();
+        ChatMessage::where('sender_id', $userId)
+            ->where('receiver_id', $currentUserId)
+            ->where('is_read', false)
             ->update(['is_read' => true]);
 
-        return response()->json(['message' => 'Messages marked as read']);
+        return response()->json(['status' => 'success']);
     }
 }
