@@ -15,13 +15,17 @@ class MessageSent implements ShouldBroadcastNow
     use Dispatchable;
     use InteractsWithSockets;
     use SerializesModels;
-
+    public ChatMessage $message;
+    public $unread_count;
     /**
      * Create a new event instance.
      */
-    public function __construct(public ChatMessage $message)
+    public function __construct(ChatMessage $message)
     {
-        //
+        $this->message = $message;
+        $this->unread_count = ChatMessage::where('receiver_id', $message->receiver_id)
+            ->where('is_read', false)
+            ->count();
     }
 
     /**
@@ -33,13 +37,6 @@ class MessageSent implements ShouldBroadcastNow
     {
         return [
             new PrivateChannel("chat.{$this->message->receiver_id}"),
-        ];
-    }
-    public function broadcastWith(): array
-    {
-        return [
-            'message' => $this->message,
-            'unread_count' => $this->message->receiver->unread_count,
         ];
     }
 }

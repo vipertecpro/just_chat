@@ -22,9 +22,13 @@ const selectedUser = ref<User | null>(null);
 
 const fetchOnlineUsers = async () => {
     if (!isFetched.value) {
-        const response = await axios.post('/api/internal/online-users');
-        onlineUsers.value = response.data;
-        isFetched.value = true;
+        try {
+            const response = await axios.post('/api/internal/online-users');
+            onlineUsers.value = response.data;
+            isFetched.value = true;
+        } catch (error) {
+            console.error('Failed to fetch online users:', error);
+        }
     }
 };
 
@@ -47,6 +51,7 @@ provide('fetchOnlineUsers', fetchOnlineUsers);
 provide('selectedUser', selectedUser);
 provide('selectUser', selectUser);
 provide('closeChat', closeChat);
+provide('currentUser', user);
 </script>
 <template>
     <div>
@@ -133,7 +138,7 @@ provide('closeChat', closeChat);
                     </svg>
                 </button>
                 <div v-if="selectedUser">
-                    <OneOnOneChat :friend="selectedUser" :current-user="user" @closeChat="closeChat" />
+                    <OneOnOneChat :friend="selectedUser" :currentUser="user" @closeChat="closeChat" />
                 </div>
                 <div v-else>
                     <slot />

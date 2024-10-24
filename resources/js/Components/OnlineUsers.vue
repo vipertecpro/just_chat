@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import {inject, onMounted, ref, Ref} from 'vue';
+import { inject, onMounted, ref, Ref, watch } from 'vue';
 import axios from 'axios';
-import {EchoServer} from "@/echo";
+import { EchoServer } from "@/echo";
 
 interface User {
     id: number;
@@ -11,24 +11,33 @@ interface User {
     unread_count: number;
 }
 
-const onlineUsers = inject<User[]>('onlineUsers', []);
+const onlineUsers = inject<Ref<User[]>>('onlineUsers', ref([]));
 const selectedUser = inject<Ref<User | null>>('selectedUser', ref(null));
-
-const selectUser = async (user: User) => {
-    selectedUser.value = user;
-    await axios.post(`/api/internal/singleChat/${user.id}/markAsRead`);
-    user.unread_count = 0; // Reset unread count
-};
-onMounted(() => {
-    onlineUsers.value.forEach((user: any) => {
-        EchoServer.private(`chat.${user.id}`)
+const currentUser = inject<User>('currentUser');
+const setupListeners = () => {
+    if (currentUser) {
+        EchoServer.private(`chat.${currentUser.id}`)
             .listen('MessageSent', (response: { message: any, unread_count: number }) => {
-                const receiver = onlineUsers.value.find(u => u.id === response.message.receiver_id);
+                const receiver = onlineUsers.value.find(u => u.id === response.message.sender_id);
                 if (receiver) {
                     receiver.unread_count = response.unread_count;
                 }
             });
-    });
+    }
+};
+const selectUser = async (user: User) => {
+    selectedUser.value = user;
+    await axios.post(`/api/internal/singleChat/${user.id}/markAsRead`);
+    user.unread_count = 0;
+};
+watch(onlineUsers, (newUsers: any) => {
+    if (newUsers.length > 0) {
+        setupListeners();
+    }
+});
+
+onMounted(() => {
+    setupListeners();
 });
 </script>
 

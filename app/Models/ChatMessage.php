@@ -11,7 +11,8 @@ class ChatMessage extends Model
     protected $fillable = [
         'sender_id',
         'receiver_id',
-        'text'
+        'text',
+        'is_read'
     ];
 
     public function sender(): BelongsTo
