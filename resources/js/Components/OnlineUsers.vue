@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, onMounted, ref, Ref, watch } from 'vue';
+import { inject, onMounted, ref, Ref } from 'vue';
 import axios from 'axios';
 import { EchoServer } from "@/echo";
 
@@ -14,6 +14,7 @@ interface User {
 const onlineUsers = inject<Ref<User[]>>('onlineUsers', ref([]));
 const selectedUser = inject<Ref<User | null>>('selectedUser', ref(null));
 const currentUser = inject<User>('currentUser');
+
 const setupListeners = () => {
     if (currentUser) {
         EchoServer.private(`chat.${currentUser.id}`)
@@ -25,16 +26,12 @@ const setupListeners = () => {
             });
     }
 };
+
 const selectUser = async (user: User) => {
     selectedUser.value = user;
     await axios.post(`/api/internal/singleChat/${user.id}/markAsRead`);
     user.unread_count = 0;
 };
-watch(onlineUsers, (newUsers: any) => {
-    if (newUsers.length > 0) {
-        setupListeners();
-    }
-});
 
 onMounted(() => {
     setupListeners();
@@ -59,7 +56,7 @@ onMounted(() => {
                     {{ user.email }}
                 </p>
             </div>
-            <span v-if="user.unread_count > 0 && (selectedUser?.id !== user.id ++ )" class="inline-flex items-center justify-center w-6 h-6 me-2 text-sm font-semibold text-gray-800 bg-gray-100 rounded-full dark:bg-gray-700 dark:text-gray-300">
+            <span v-if="user.unread_count > 0 && (selectedUser?.id !== user.id)" class="inline-flex items-center justify-center w-6 h-6 me-2 text-sm font-semibold text-gray-800 bg-gray-100 rounded-full dark:bg-gray-700 dark:text-gray-300">
                 {{ user.unread_count }}
             </span>
         </a>
@@ -67,5 +64,4 @@ onMounted(() => {
 </template>
 
 <style scoped>
-
 </style>

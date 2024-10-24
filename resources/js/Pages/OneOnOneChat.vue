@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axios from "axios";
-import { nextTick, onMounted, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { EchoServer } from "@/echo";
 import { PresenceChannel } from 'laravel-echo';
 
@@ -15,6 +15,7 @@ interface Message {
     receiver_id: number;
     text: string;
     created_at_relative: string;
+    is_read: boolean;
 }
 
 const props = defineProps<{
@@ -27,7 +28,7 @@ const newMessage = ref("");
 const messageBox = ref<HTMLDivElement | null>(null);
 const isFriendTyping = ref(false);
 const isFriendTypingTimer = ref<number | null>(null);
-const isFriendOnline = ref(false);
+const isChatBoxOpen = ref(false);
 
 const scrollToBottom = () => {
     nextTick(() => {
@@ -62,6 +63,7 @@ const sendMessage = async () => {
             receiver_id: response.data.receiver_id,
             text: response.data.text,
             created_at_relative: response.data.created_at_relative,
+            is_read: response.data.is_read,
         };
         messages.value.push(newMsg);
         newMessage.value = "";
@@ -75,17 +77,29 @@ const sendTypingEvent = () => {
     });
 };
 
+const markMessageAsRead = async (messageId: number) => {
+    await axios.post(`/api/internal/singleChat/${messageId}/markAsRead`);
+};
+
 onMounted(() => {
+    isChatBoxOpen.value = true;
     fetchMessages();
     watch(() => props.friend, fetchMessages);
 });
 
+onBeforeUnmount(() => {
+    isChatBoxOpen.value = false;
+});
+
 EchoServer.private(`chat.${props.currentUser.id}`)
-    .listen("MessageSent", (response: { message: Message, unread_count: number }) => {
+    .listen("MessageSent", async (response: { message: Message, unread_count: number }) => {
         if ((response.message.sender_id === props.currentUser.id && response.message.receiver_id === props.friend.id) ||
             (response.message.sender_id === props.friend.id && response.message.receiver_id === props.currentUser.id)) {
             messages.value.push(response.message);
             scrollToBottom();
+            if (response.message.sender_id === props.friend.id && isChatBoxOpen.value) {
+                await markMessageAsRead(response.message.id);
+            }
         }
     })
     .listenForWhisper("typing", (response: { userID: number }) => {
@@ -146,7 +160,7 @@ EchoServer.private(`chat.${props.currentUser.id}`)
                 />
                 <button type="button" @click="sendMessage" class="ml-2 p-2 text-blue-600 rounded-full dark:text-blue-500">
                     <svg class="w-5 h-5 rotate-90 rtl:-rotate-90" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 18 20">
-                        <path d="m17.914 18.594-8-18a1 1 0 0 0-1.828 0l-8 18a 1 0 0 0 1.157 1.376L8 18.281V9a1 1 0 0 1 2 0v9.281l6.758 1.689a1 1 0 0 0 1.156-1.376Z"/>
+                        <path d="m17.914 18.594-8-18a1 1 0 0 0-1.828 0l-8 18a 1 0 0 0 1.157 1.376L8 18.281V9a1 0 0 1 2 0v9.281l6.758 1.689a1 0 0 0 1.156-1.376Z"/>
                     </svg>
                 </button>
             </div>

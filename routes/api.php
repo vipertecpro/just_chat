@@ -2,6 +2,8 @@
 
 use App\Events\UserStatusChanged;
 use App\Http\Controllers\InternalApiController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 Route::post('/user/online-status', function (Request $request) {
     $user = auth()->user();

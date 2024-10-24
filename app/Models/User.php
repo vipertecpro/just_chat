@@ -23,7 +23,7 @@ class User extends Authenticatable
         'password',
         'is_online'
     ];
-
+    protected $appends = ['unread_count'];
     /**
      * The attributes that should be hidden for serialization.
      *
@@ -48,8 +48,9 @@ class User extends Authenticatable
     }
     public function getUnreadCountAttribute(): int
     {
-        return ChatMessage::where('receiver_id', $this->id)
-            ->where('sender_id', '!=', $this->id)
+        $currentUserId = auth()->id();
+        return ChatMessage::where('sender_id', $this->id)
+            ->where('receiver_id', $currentUserId)
             ->where('is_read', false)
             ->count();
     }

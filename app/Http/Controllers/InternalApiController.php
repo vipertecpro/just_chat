@@ -11,9 +11,16 @@ class InternalApiController extends Controller
 {
     public function onlineUsers(Request $request)
     {
-        $users = User::where('id','!=',auth()->id())->orderBy('is_online', 'desc')->get();
-        $users->map(function ($user) {
-            $user->append('unread_count');
+        $currentUserId = auth()->id();
+        $users = User::where('id', '!=', $currentUserId)
+            ->orderBy('is_online', 'desc')
+            ->get();
+
+        $users->map(function ($user) use ($currentUserId) {
+            $user->unread_count = ChatMessage::where('sender_id', $user->id)
+                ->where('receiver_id', $currentUserId)
+                ->where('is_read', false)
+                ->count();
         });
         return response()->json($users);
     }
