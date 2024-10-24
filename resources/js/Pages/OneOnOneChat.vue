@@ -27,6 +27,7 @@ const newMessage = ref("");
 const messageBox = ref<HTMLDivElement | null>(null);
 const isFriendTyping = ref(false);
 const isFriendTypingTimer = ref<number | null>(null);
+const isFriendOnline = ref(false);
 
 const scrollToBottom = () => {
     nextTick(() => {
@@ -74,9 +75,10 @@ const sendTypingEvent = () => {
     });
 };
 
-onMounted(fetchMessages);
-
-watch(() => props.friend, fetchMessages);
+onMounted(() => {
+    fetchMessages();
+    watch(() => props.friend, fetchMessages);
+});
 
 EchoServer.private(`chat.${props.currentUser.id}`)
     .listen("MessageSent", (response: { message: Message, unread_count: number }) => {

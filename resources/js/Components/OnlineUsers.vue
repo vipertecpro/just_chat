@@ -19,7 +19,7 @@ const setupListeners = () => {
         EchoServer.private(`chat.${currentUser.id}`)
             .listen('MessageSent', (response: { message: any, unread_count: number }) => {
                 const receiver = onlineUsers.value.find(u => u.id === response.message.sender_id);
-                if (receiver) {
+                if (receiver && selectedUser.value?.id !== response.message.sender_id) {
                     receiver.unread_count = response.unread_count;
                 }
             });
@@ -59,7 +59,7 @@ onMounted(() => {
                     {{ user.email }}
                 </p>
             </div>
-            <span v-if="user.unread_count > 0" class="inline-flex items-center justify-center w-6 h-6 me-2 text-sm font-semibold text-gray-800 bg-gray-100 rounded-full dark:bg-gray-700 dark:text-gray-300">
+            <span v-if="user.unread_count > 0 && (selectedUser?.id !== user.id ++ )" class="inline-flex items-center justify-center w-6 h-6 me-2 text-sm font-semibold text-gray-800 bg-gray-100 rounded-full dark:bg-gray-700 dark:text-gray-300">
                 {{ user.unread_count }}
             </span>
         </a>
